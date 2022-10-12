@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "trove_utils.h": "c",
-        "index_utils.h": "c",
-        "iterator": "c",
-        "sstream": "c"
-    }
-}
