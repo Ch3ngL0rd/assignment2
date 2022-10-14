@@ -6,13 +6,21 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <stdbool.h>
+#include <ctype.h>
+#include <unistd.h>
 
-#define TABLE_SIZE 100000
+#define TABLE_SIZE 10000
+
+typedef struct value_t
+{
+    char *value;
+    struct value_t *next;
+} value_t; // COME BACK TO THIS MAY BE ABLE TO TURN VALUE INTO A LINKED LIST
 
 typedef struct entry_t
 {
     char *key;
-    char *value;
+    char *value; // Need to change this to include 1. # of paths containing the word, and 2. Continuous string containing the values separated by
     struct entry_t *next;
 } entry_t;
 
@@ -20,6 +28,31 @@ typedef struct
 {
     entry_t **entries;
 } ht_t;
+
+ht_t *ht;
+
+void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
+{
+    int needle_first;
+    const void *p = haystack;
+    size_t plen = hlen;
+
+    if (!nlen)
+        return NULL;
+
+    needle_first = *(unsigned char *)needle;
+
+    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
+    {
+        if (!memcmp(p, needle, nlen))
+            return (void *)p;
+
+        p++;
+        plen = hlen - (p - haystack);
+    }
+
+    return NULL;
+}
 
 unsigned int hash(const char *key)
 {
@@ -44,7 +77,7 @@ entry_t *ht_pair(const char *key, const char *value)
     // allocate the entry
     entry_t *entry = malloc(sizeof(entry_t) * 1);
     entry->key = malloc(strlen(key) + 1);
-    entry->value = malloc(strlen(value) + 1);
+    entry->value = malloc(strlen(value) + 1); // THIS NEEDS TO BE CHANGED
 
     // copy the key and value in place
     strcpy(entry->key, key);
@@ -87,6 +120,10 @@ void ht_set(ht_t *hashtable, const char *key, const char *value)
         hashtable->entries[slot] = ht_pair(key, value);
         return;
     }
+    else if (strstr(entry->value, value))
+    {
+        return;
+    }
 
     entry_t *prev;
 
@@ -98,9 +135,32 @@ void ht_set(ht_t *hashtable, const char *key, const char *value)
         if (strcmp(entry->key, key) == 0)
         {
             // match found, replace value
-            free(entry->value);
-            entry->value = malloc(strlen(value) + 1);
-            strcpy(entry->value, value);
+            // NEED TO CHANGE THIS INSTEAD OF REPLACING THE VALUE - REALLOCATE THE SPACE
+            // AND ADD TO ARRAY
+            // free(entry->value);
+            // entry->value = malloc(strlen(value) + 1);
+            // strcpy(entry->value, value);
+            // return;
+
+            // Checks if a word is found in the file - if it is currently just prints the
+            // file name and the absolute path to the file
+            // will be able to alter this after and change it to check the hashmap
+            // NOTE: Need to check if I need to include the sizeof(char) or not
+
+            char *temp;
+            size_t newlen;
+
+            newlen = strlen(entry->value) + strlen(value) + 2; // Adding + 2 to take into account for the space and the new null byte
+            temp = (char *)malloc(newlen);
+
+            strcpy(temp, entry->value);
+            strcat(temp, " ");
+            strcat(temp, value);
+
+            // free(entry->value);
+
+            entry->value = realloc(entry->value, newlen);
+            strcpy(entry->value, temp);
             return;
         }
 
@@ -234,43 +294,27 @@ void ht_dump(ht_t *hashtable)
     }
 }
 
-bool checkOccurrence(const char *haystack, const char *needle)
+void add_words(FILE *f, int min_len, char *path)
 {
-    if (strstr(haystack, needle))
+    int character;   // integer representation of character we will store in the file
+    char word[1000]; // where we store the character each iteration
+
+    while (!feof(f))
     {
-        return true;
+        int index = 0;
+        while ((character = fgetc(f)) != EOF && isalnum(character))
+        {
+            word[index] = character;
+            index++;
+        }
+        word[index] = '\0';
+
+        // If the word is greater than or = to the min length then we add it to the hashmap
+        if (strlen(word) >= min_len)
+        {
+            ht_set(ht, word, path);
+        }
     }
-    else
-    {
-        return false;
-    }
-}
-
-// This is a function I found on stackoverflow that allows you to check if there
-// is an occurrence of a word in the "haystack" which can be a text or binary file
-// if you google search memmem it will talk about this actual function but I couldn't
-// figure out how to implement it on my own - might need to ask in the lab
-void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
-{
-    int needle_first;
-    const void *p = haystack;
-    size_t plen = hlen;
-
-    if (!nlen)
-        return NULL;
-
-    needle_first = *(unsigned char *)needle;
-
-    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
-    {
-        if (!memcmp(p, needle, nlen))
-            return (void *)p;
-
-        p++;
-        plen = hlen - (p - haystack);
-    }
-
-    return NULL;
 }
 
 void myfilerecursive(char *basePath)
@@ -290,6 +334,9 @@ void myfilerecursive(char *basePath)
             strcat(path, "/");
             strcat(path, dp->d_name);
 
+            // Check if this is a file or a directory - this is where my program was
+            // breaking last time
+
             FILE *f = fopen(path, "rb"); // File pointer to the start of path
 
             // Adding values to the stat struct so we can retrieve the file contents
@@ -299,49 +346,103 @@ void myfilerecursive(char *basePath)
                 perror("stat");
                 exit(EXIT_FAILURE);
             }
-
-            char *file_contents = malloc(sb.st_size); // Setting the size of the file to the size
-            fread(file_contents, sb.st_size, 1, f);   // Adding contents to file_contents
-
-            // Checks if a word is found in the file - if it is currently just prints the
-            // file name and the absolute path to the file
-            // will be able to alter this after and change it to check the hashmap
-            // NOTE: Need to check if I need to include the sizeof(char) or not
-            if (memmem(file_contents, sb.st_size * sizeof(char), "while", strlen("while")))
+            else if (S_ISDIR(sb.st_mode))
             {
-                printf("DIRECTORY/FILE NAME: %-35s ABSOLUTE PATH NAME: %s\n", dp->d_name, path);
+                // Checks if a folder - if it is we continue as we only need to scan
+                // file contents
+                fclose(f);
+                myfilerecursive(path);
+            }
+            else
+            {
+                add_words(f, 4, path);
+                fclose(f);
+                myfilerecursive(path);
             }
 
-            free(file_contents);
+            // char *file_contents = malloc(sb.st_size); // Setting the size of the file to the size
+            // fread(file_contents, sb.st_size, 1, f);   // Adding contents to file_contents
 
-            // free(string);
-            // string[fsize] = 0; --- not really sure what the difference is here
+            // // Checks if a word is found in the file - if it is currently just prints the
+            // // file name and the absolute path to the file
+            // // will be able to alter this after and change it to check the hashmap
+            // // NOTE: Need to check if I need to include the sizeof(char) or not
+            // // if (memmem(file_contents, sb.st_size * sizeof(char), "while", strlen("while")))
+            // // {
+            // //     printf("DIRECTORY/FILE NAME: %-35s ABSOLUTE PATH NAME: %s\n", dp->d_name, path);
+            // // }
+            // // printf("DIRECTORY/FILE NAME: %-35s ABSOLUTE PATH NAME: %s\n", dp->d_name, path);
 
-            fclose(f);
-
-            myfilerecursive(path);
+            // free(file_contents);
         }
     }
 
     closedir(dir);
 }
 
+void build_trove(ht_t *hashtable)
+{
+    FILE *f = fopen("trove-file.txt", "wb");
+    if (f == NULL)
+    {
+        printf("Error opening file!\n");
+        exit(1);
+    }
+
+    for (int i = 0; i < TABLE_SIZE; ++i)
+    {
+        entry_t *entry = hashtable->entries[i];
+
+        if (entry == NULL)
+        {
+            continue;
+        }
+
+        for (;;)
+        {
+            // printf("%s=%s ", entry->key, entry->value);
+
+            fprintf(f, "%s\n", entry->key);
+            fprintf(f, "%s\n", entry->value);
+
+            if (entry->next == NULL)
+            {
+                break;
+            }
+
+            entry = entry->next;
+        }
+    }
+    fclose(f);
+}
+
 int main(int argc, char *argv[])
 {
-    //     ht_t *ht = ht_create();
 
-    //     ht_set(ht, "name1", "em");
-    //     ht_set(ht, "name2", "russian");
-    //     ht_set(ht, "name3", "pizza");
-    //     ht_set(ht, "name4", "doge");
-    //     ht_set(ht, "name5", "pyro");
-    //     ht_set(ht, "name6", "joost");
-    //     ht_set(ht, "name7", "kalix");
+    // --------------- CREATION OF HASHMAP AND INSERTION OF RANDOM VALS ------------- //
+    ht = ht_create();
 
-    //     ht_dump(ht);
+    // ht_set(ht, "name1", "em");
+    // ht_set(ht, "name2", "russian");
+    // ht_set(ht, "name3", "pizza");
+    // ht_set(ht, "name4", "doge");
+    // ht_set(ht, "name5", "pyro");
+    // ht_set(ht, "name6", "joost");
+    // ht_set(ht, "name7", "kalix");
+    // ht_set(ht, "name7", "fdgfdgd");
 
-    //
+    //-- -- -- -- -- -- -RECURSIVE FILE SEARCH PROMPT 1 -- -- -- -- -- -- -- - //
     myfilerecursive(argv[1]);
+    ht_dump(ht);
+    // Proves that works for collisions!
+    // 1. Set table number to low number and find print statement from ht_dump where there
+    // is a collision
+    // 2. Use the ht_get function - this will show we can still retrieve the value as it
+    // is set up as a linkedlist
+    printf("%s\n", ht_get(ht, "DECLARE"));
+    printf("%s\n", ht_get(ht, "Instead")); // these two have the same hash value - check SLOT 9348
+
+    build_trove(ht);
 
     return 0;
 }
