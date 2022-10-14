@@ -8,6 +8,13 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <limits.h>
+
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+// ---------------------HASHTABLE FUNCTIONS/DECLARATIONS------------------- //
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
 
 #define TABLE_SIZE 10000
 
@@ -30,29 +37,6 @@ typedef struct
 } ht_t;
 
 ht_t *ht;
-
-void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
-{
-    int needle_first;
-    const void *p = haystack;
-    size_t plen = hlen;
-
-    if (!nlen)
-        return NULL;
-
-    needle_first = *(unsigned char *)needle;
-
-    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
-    {
-        if (!memcmp(p, needle, nlen))
-            return (void *)p;
-
-        p++;
-        plen = hlen - (p - haystack);
-    }
-
-    return NULL;
-}
 
 unsigned int hash(const char *key)
 {
@@ -293,6 +277,20 @@ void ht_dump(ht_t *hashtable)
         printf("\n");
     }
 }
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+//
+//
+//
+//
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
 
 void add_words(FILE *f, int min_len, char *path)
 {
@@ -312,14 +310,14 @@ void add_words(FILE *f, int min_len, char *path)
         // If the word is greater than or = to the min length then we add it to the hashmap
         if (strlen(word) >= min_len)
         {
-            ht_set(ht, word, path);
+            ht_set(ht, word, path); // Adds values to the hashtable
         }
     }
 }
 
-void myfilerecursive(char *basePath)
+void file_search(char *basePath, int min_len)
 {
-    char path[1000]; // Need to make this dynamic somehow!
+    char path[PATH_MAX]; // MIGHT BE A BETTER WAY TO GET ABSOLUTE PATHS
     struct dirent *dp;
     DIR *dir = opendir(basePath);
 
@@ -330,56 +328,48 @@ void myfilerecursive(char *basePath)
     {
         if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
         {
-            strcpy(path, basePath);
-            strcat(path, "/");
-            strcat(path, dp->d_name);
+            strcpy(path, basePath);   // copy the basepath to path
+            strcat(path, "/");        // concatenate "/"
+            strcat(path, dp->d_name); // concatenate directory/file name
 
-            // Check if this is a file or a directory - this is where my program was
-            // breaking last time
+            FILE *f = fopen(path, "rb"); // File pointer to the start of path - NEED TO ADD ERROR CHECK IN HERE
 
-            FILE *f = fopen(path, "rb"); // File pointer to the start of path
+            char buffer[PATH_MAX];                   // Get the new absolute path to pass into function for recursive file search
+            char *abs_path = realpath(path, buffer); // May need to do an error check here
 
             // Adding values to the stat struct so we can retrieve the file contents
             struct stat sb;
             if (stat(path, &sb) == -1)
             {
-                perror("stat");
-                exit(EXIT_FAILURE);
             }
             else if (S_ISDIR(sb.st_mode))
             {
                 // Checks if a folder - if it is we continue as we only need to scan
                 // file contents
                 fclose(f);
-                myfilerecursive(path);
+                file_search(buffer, min_len);
             }
             else
             {
-                add_words(f, 4, path);
+                // char *real_path = realpath(dp->d_name, path);
+                // printf("%s\n", path);
+                add_words(f, min_len, buffer); // Searches through the file for all words >= min_len
                 fclose(f);
-                myfilerecursive(path);
+                file_search(buffer, min_len);
             }
-
-            // char *file_contents = malloc(sb.st_size); // Setting the size of the file to the size
-            // fread(file_contents, sb.st_size, 1, f);   // Adding contents to file_contents
-
-            // // Checks if a word is found in the file - if it is currently just prints the
-            // // file name and the absolute path to the file
-            // // will be able to alter this after and change it to check the hashmap
-            // // NOTE: Need to check if I need to include the sizeof(char) or not
-            // // if (memmem(file_contents, sb.st_size * sizeof(char), "while", strlen("while")))
-            // // {
-            // //     printf("DIRECTORY/FILE NAME: %-35s ABSOLUTE PATH NAME: %s\n", dp->d_name, path);
-            // // }
-            // // printf("DIRECTORY/FILE NAME: %-35s ABSOLUTE PATH NAME: %s\n", dp->d_name, path);
-
-            // free(file_contents);
         }
     }
 
     closedir(dir);
 }
 
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+// --------------------------TROVE UTILITIES------------------------------- //
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+
+// Build Trove file
 void build_trove(ht_t *hashtable)
 {
     FILE *f = fopen("trove-file.txt", "wb");
@@ -416,33 +406,67 @@ void build_trove(ht_t *hashtable)
     fclose(f);
 }
 
+// Search trove file for word
+void search_word(char *filename, char *word)
+{
+    FILE *f = fopen("trove-file.txt", "rb");
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    if (f == NULL)
+    {
+        printf("Error opening file!\n");
+        exit(1);
+    }
+
+    while ((read = getline(&line, &len, f)) != -1)
+    {
+        // printf("Retrieved line of length %zu:\n", read);
+        // printf("%s", line);
+        line[strcspn(line, "\n")] = 0;
+        if (strcmp(line, word) == 0)
+        {
+            // Retrieve the next value which will be the absolute paths
+            read = getline(&line, &len, f);
+            line[strcspn(line, "\n")] = 0;
+            printf("%s", line);
+        }
+    }
+
+    fclose(f);
+    if (line)
+        free(line);
+    exit(EXIT_SUCCESS);
+}
+
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+// --------------------------------MAIN------------------------------------ //
+// ------------------------------------------------------------------------ //
+// ------------------------------------------------------------------------ //
+
 int main(int argc, char *argv[])
 {
-
-    // --------------- CREATION OF HASHMAP AND INSERTION OF RANDOM VALS ------------- //
+    int min_len = 4;
+    // --------------- CREATION OF HASHMAP ------------- //
     ht = ht_create();
 
-    // ht_set(ht, "name1", "em");
-    // ht_set(ht, "name2", "russian");
-    // ht_set(ht, "name3", "pizza");
-    // ht_set(ht, "name4", "doge");
-    // ht_set(ht, "name5", "pyro");
-    // ht_set(ht, "name6", "joost");
-    // ht_set(ht, "name7", "kalix");
-    // ht_set(ht, "name7", "fdgfdgd");
+    //-------------RECURSIVE FILE SEARCH--------------- //
+    file_search(argv[1], min_len);
 
-    //-- -- -- -- -- -- -RECURSIVE FILE SEARCH PROMPT 1 -- -- -- -- -- -- -- - //
-    myfilerecursive(argv[1]);
-    ht_dump(ht);
-    // Proves that works for collisions!
-    // 1. Set table number to low number and find print statement from ht_dump where there
+    // ht_dump(ht);
+    // Proves that works for collisions! - TABLE SIZE 10,000
+    // 1. Set table number to 10,000 and find print statement from ht_dump where there
     // is a collision
     // 2. Use the ht_get function - this will show we can still retrieve the value as it
     // is set up as a linkedlist
-    printf("%s\n", ht_get(ht, "DECLARE"));
-    printf("%s\n", ht_get(ht, "Instead")); // these two have the same hash value - check SLOT 9348
+    // printf("%s\n", ht_get(ht, "DECLARE"));
+    // printf("%s\n", ht_get(ht, "Instead")); // these two have the same hash value - check SLOT 9348
 
     build_trove(ht);
+
+    search_word("trove-file.txt", "hello");
 
     return 0;
 }
