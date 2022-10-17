@@ -5,6 +5,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <stdbool.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -16,13 +17,12 @@
 // ------------------------------------------------------------------------ //
 // ------------------------------------------------------------------------ //
 
-#define TABLE_SIZE 10000
+#define TABLE_SIZE 100000
 
-typedef struct value_t
-{
-    char *value;
-    struct value_t *next;
-} value_t; // COME BACK TO THIS MAY BE ABLE TO TURN VALUE INTO A LINKED LIST
+// Function declarations
+void dir_search(char *basePath, int min_len);
+void scan_file(char *abs_path, int min_len);
+void is_dir(char *base_path, int min_len);
 
 typedef struct entry_t
 {
@@ -38,6 +38,7 @@ typedef struct
 
 ht_t *ht;
 
+// Hash function
 unsigned int hash(const char *key)
 {
     unsigned long int value = 0;
@@ -73,6 +74,7 @@ entry_t *ht_pair(const char *key, const char *value)
     return entry;
 }
 
+// Creates the hashtable and sets all entries to null
 ht_t *ht_create(void)
 {
     // allocate table
@@ -91,6 +93,15 @@ ht_t *ht_create(void)
     return hashtable;
 }
 
+// Sets the key and value in the hashtable
+// Firstly it checks if the slot in the hashtable == NULL, if it does then simply insert the ht_pair in
+// the entry slot
+// Secondly if not, it walks along the linked list until it finds the matching key that is passed in as
+// a parameter
+// Once this is found, (at the moment) we reallocate the space for the value variable so we can
+// include the new absolute path (separated by a space) which can be used to build the trove-file later
+// NOTE: I want to change this from a space " " to maybe a null byte and see if I can iterate over the
+// elements inside just like we do with the command line *argv[]...
 void ht_set(ht_t *hashtable, const char *key, const char *value)
 {
     unsigned int slot = hash(key);
@@ -118,19 +129,6 @@ void ht_set(ht_t *hashtable, const char *key, const char *value)
         // check key
         if (strcmp(entry->key, key) == 0)
         {
-            // match found, replace value
-            // NEED TO CHANGE THIS INSTEAD OF REPLACING THE VALUE - REALLOCATE THE SPACE
-            // AND ADD TO ARRAY
-            // free(entry->value);
-            // entry->value = malloc(strlen(value) + 1);
-            // strcpy(entry->value, value);
-            // return;
-
-            // Checks if a word is found in the file - if it is currently just prints the
-            // file name and the absolute path to the file
-            // will be able to alter this after and change it to check the hashmap
-            // NOTE: Need to check if I need to include the sizeof(char) or not
-
             char *temp;
             size_t newlen;
 
@@ -140,8 +138,6 @@ void ht_set(ht_t *hashtable, const char *key, const char *value)
             strcpy(temp, entry->value);
             strcat(temp, " "); // Change to "\0"
             strcat(temp, value);
-
-            // free(entry->value);
 
             entry->value = realloc(entry->value, newlen);
             strcpy(entry->value, temp);
@@ -157,6 +153,7 @@ void ht_set(ht_t *hashtable, const char *key, const char *value)
     prev->next = ht_pair(key, value);
 }
 
+// Retrieves a single value when a key is passed in
 char *ht_get(ht_t *hashtable, const char *key)
 {
     unsigned int slot = hash(key);
@@ -187,6 +184,7 @@ char *ht_get(ht_t *hashtable, const char *key)
     return NULL;
 }
 
+// Deletes a key/value pair
 void ht_del(ht_t *hashtable, const char *key)
 {
     unsigned int bucket = hash(key);
@@ -249,6 +247,8 @@ void ht_del(ht_t *hashtable, const char *key)
     }
 }
 
+// This is simply for debugging purposes - will delete this later
+// but allows us to check the slots and what key and values are in them
 void ht_dump(ht_t *hashtable)
 {
     for (int i = 0; i < TABLE_SIZE; ++i)
@@ -277,25 +277,14 @@ void ht_dump(ht_t *hashtable)
         printf("\n");
     }
 }
-// ------------------------------------------------------------------------ //
-// ------------------------------------------------------------------------ //
-// ------------------------------------------------------------------------ //
-// ------------------------------------------------------------------------ //
-// ------------------------------------------------------------------------ //
-//
-//
-//
-//
-// ------------------------------------------------------------------------ //
-// ------------------------------------------------------------------------ //
-// ------------------------------------------------------------------------ //
-// ------------------------------------------------------------------------ //
-// ------------------------------------------------------------------------ //
 
+// A function that takes in a file and iterates through finding each word that is strictly
+// ALPHANUMERIC - and then passes the newly created word and its absolute path into ht_set
+// so it can then be added to the hashtable
 void add_words(FILE *f, int min_len, char *path)
 {
     int character;   // integer representation of character we will store in the file
-    char word[1000]; // where we store the character each iteration
+    char word[1000]; // where we store the character each iteration - currently hardcoded at the moment
 
     while (!feof(f))
     {
@@ -315,14 +304,21 @@ void add_words(FILE *f, int min_len, char *path)
     }
 }
 
-void file_search(char *basePath, int min_len)
+// Recursively searches through a directory and scans the files
+// Each call to dir_search appends "/dp->d_name"
+// From here we check if it is a directory again or a file and each recursive loop
+// will keep going through this process and find all the files in the directory that
+// is passed into the commandline
+void dir_search(char *basePath, int min_len)
 {
-    char path[PATH_MAX]; // MIGHT BE A BETTER WAY TO GET ABSOLUTE PATHS
+    char path[PATH_MAX];
     struct dirent *dp;
     DIR *dir = opendir(basePath);
 
     if (!dir)
+    {
         return;
+    }
 
     while ((dp = readdir(dir)) != NULL)
     {
@@ -332,35 +328,63 @@ void file_search(char *basePath, int min_len)
             strcat(path, "/");        // concatenate "/"
             strcat(path, dp->d_name); // concatenate directory/file name
 
-            FILE *f = fopen(path, "rb"); // File pointer to the start of path - NEED TO ADD ERROR CHECK IN HERE
-
-            char buffer[PATH_MAX];                   // Get the new absolute path to pass into function for recursive file search
-            char *abs_path = realpath(path, buffer); // May need to do an error check here
-
-            // Adding values to the stat struct so we can retrieve the file contents
-            struct stat sb;
-            if (stat(path, &sb) == -1)
+            struct stat st;
+            if (stat(path, &st) == 0)
             {
-            }
-            else if (S_ISDIR(sb.st_mode))
-            {
-                // Checks if a folder - if it is we continue as we only need to scan
-                // file contents
-                fclose(f);
-                file_search(buffer, min_len);
-            }
-            else
-            {
-                // char *real_path = realpath(dp->d_name, path);
-                // printf("%s\n", path);
-                add_words(f, min_len, buffer); // Searches through the file for all words >= min_len
-                fclose(f);
-                file_search(buffer, min_len);
+                if (S_ISDIR(st.st_mode))
+                {
+                    dir_search(path, min_len);
+                }
+                else
+                {
+                    FILE *f = fopen(path, "rb");
+                    scan_file(path, min_len);
+                }
             }
         }
     }
-
     closedir(dir);
+}
+
+// This function scans through the file and adds the words and absolute path to a hashtable
+void scan_file(char *abs_path, int min_len)
+{
+    FILE *f = fopen(abs_path, "rb");
+    add_words(f, min_len, abs_path); // Searches through the file for all words >= min_len
+    fclose(f);
+}
+
+// This function is used when we first check to see if a command line argument is a file or a directory
+// If it is a FILE, then we simply scan the file and add the words to the hashtable
+// If it is a DIRECTORY, we call dir_search and pass in the absolute path for the commandline argument
+void is_dir(char *base_path, int min_len)
+{
+    char buffer[PATH_MAX];
+    char *res = realpath(base_path, buffer); // Retrieve the ABSOLUTE PATH and copy to 'buffer'
+
+    if (res)
+    {
+        // stat struct allows us to check if the 'buffer' absolute path is a directory or a
+        // file by using the st_mode variable
+        struct stat st;
+        stat(buffer, &st);
+        DIR *dir = opendir(buffer);
+
+        if (S_ISDIR(st.st_mode))
+        {
+            // If command line argument is a directory - we will pass the buffer into dir_search
+            // and recursively traverse through the folder to find all the files and add
+            // their words to the hashtable
+            closedir(dir); // probably not efficient but allows the dir_search function to work properly
+            dir_search(buffer, min_len);
+        }
+        else
+        {
+            // If command line argument is a file - we will pass the bugger into scan_file
+            // and this will add the words to the hashtable
+            scan_file(buffer, min_len);
+        }
+    }
 }
 
 // ------------------------------------------------------------------------ //
@@ -448,32 +472,21 @@ void search_word(char *filename, char *word)
 
 int main(int argc, char *argv[])
 {
-    // Cases
-    // 0            1       2            3          4           5           6...inf
-    // ----------------------------------- BUILD ------------------------------------- //
-    // ./trove      -f      <filename>   -b         -l          <length>    <filelist>
-    // ./trove      -f      <filename>   -b         <filelist>
-    // ./trove      -b      -l           <length>   <filelist>
-    // ./trove      -b      <filelist>
-    // ----------------------------------- UPDATE ------------------------------------- //
-    // ./trove      -f      <filename>   -u         -l          <length>    <filelist>
-    // ./trove      -f      <filename>   -u         <filelist>
-    // ./trove      -u      -l           <length>   <filelist>
-    // ./trove      -u      <filelist>
-    // ----------------------------------- REMOVE ------------------------------------- //
-    // ./trove      -f      <filename>   -r         -l          <length>    <filelist>
-    // ./trove      -f      <filename>   -r         <filelist>
-    // ./trove      -r      -l           <length>   <filelist>
-    // ./trove      -r      <filelist>
-    // -------------------------------- WORD RETRIEVE --------------------------------- //
-    // ./trove      -f      <filename>   <word>
-    // ./trove      <word>
-
+    // Used for getopt() function
     int opt;
-    int min_len = 4; // default minimum length
+
+    // The default minimum length when -l is not passed into command line
+    int min_len = 4;
+
+    // Dynamically allocating space for the filename incase this changes via a commandline input
     char *filename = (char *)malloc(strlen("trove") + 1);
     strcpy(filename, "trove");
 
+    // Create the hashtable
+    ht = ht_create();
+
+    // Check to see if no arguments have been passed in and returns a statement
+    // prompting the user how to use ./trove
     if (argc < 2)
     {
         printf("\nUsage: ./trove [-f filename] [-b | -r | -u] [-l length] filelist\nor     ./trove [-f filename] word\n\nwhere options are:\n-b		build a new trove-file\n-f filename	provide the name of the trove-file to be built or searched\n-l length	specify the minimum-length of words added to the trove-file\n-r		remove information from the trove-file\n-u		update information in the trove-file\n\n");
@@ -485,19 +498,28 @@ int main(int argc, char *argv[])
         switch (opt)
         {
         case 'f':
-            // Need to check get the filename
+            // Reallocate the memory to = the length of the filename passed in + 1 for the null byte
             filename = (char *)realloc(filename, strlen(optarg) + 1);
             strcpy(filename, optarg);
-            printf("%s\n", filename);
-            printf("The trove-file name to be build or searched is: %s\n", optarg);
+
+            // Debug code
+            // printf("The trove-file name to be build or searched is: %s\n", filename);
             break;
         case 'l':
             // Get the length from the arguments
+            // MAY NEED TO ADD A CHECK IN TO MAKE SURE MIN LENGTH IS >= 1
             min_len = atoi(optarg);
-            printf("The min length passed in is %d\n", min_len);
+            if (min_len < 1)
+            {
+                printf("Must provide a positive integer for -l argument!");
+                return EXIT_FAILURE;
+            }
+
+            // Debug code
+            // printf("The min length passed in is %d\n", min_len);
             break;
         case 'r':
-            // Retrieve the first argument for filename
+            // Retrieve the first argument for filename from list of files
             printf("The first argument is: %s\n", optarg);
             // Retrieve the extra arguments of filenames if any
             for (; optind < argc; optind++)
@@ -506,6 +528,7 @@ int main(int argc, char *argv[])
             }
             break;
         case 'u':
+            // Retrieve the first argument for filename from list of files
             printf("The first argument is: %s\n", optarg);
             // Retrieve the extra arguments of filenames if any
             for (; optind < argc; optind++)
@@ -514,8 +537,14 @@ int main(int argc, char *argv[])
             }
             break;
         case 'b':
+            // Retrieve the first argument for filename from list of files
             printf("The first argument is: %s\n", optarg);
-            // Retrieve the extra arguments of filenames if any
+            is_dir(optarg, min_len);
+            for (; optind < argc; optind++)
+            {
+                is_dir(argv[optind], min_len);
+            }
+            ht_dump(ht);
             break;
         case '?':
             printf("Invalid argument!\n");
@@ -526,51 +555,38 @@ int main(int argc, char *argv[])
         }
     }
 
-    for (; optind < argc; optind++)
-    {
-        printf("The extra arguments are: %s\n", argv[optind]);
-    }
-
-    // if no other arguments are passed in then we will have the filename
-    // either "trove" OR the cl option passed in with the -f flag
-    // this means we are searching for the next
-
     // Remove filename from memory
     free(filename);
 
     return 0;
-
-    // File output
-    // printf("%s\n", *argv);
 }
 
 // ------------------------------ DEBUG CODE ------------------------------- //
-
-// int min_len = 4;
-// // --------------- CREATION OF HASHMAP ------------- //
-// ht = ht_create();
-
-// //-------------RECURSIVE FILE SEARCH--------------- //
-// file_search(argv[1], min_len);
-
-// // ht_dump(ht);
-// // Proves that works for collisions! - TABLE SIZE 10,000
-// // 1. Set table number to 10,000 and find print statement from ht_dump where there
-// // is a collision
-// // 2. Use the ht_get function - this will show we can still retrieve the value as it
-// // is set up as a linkedlist
-// // printf("%s\n", ht_get(ht, "DECLARE"));
-// // printf("%s\n", ht_get(ht, "Instead")); // these two have the same hash value - check SLOT 9348
-
-// build_trove(ht);
 
 // search_word("trove-file.txt", "hello");
 
 // char buffer[PATH_MAX]; // Get the new absolute path to pass into function for recursive file search
 // char *abs_path = realpath("/tmp", buffer);
 
-// // char const *folder = getenv("TMPDIR");
-// // if (folder == 0)
-// //     folder = "/tmp";
-
 // printf("%s\n", buffer);
+
+// Cases
+// 0            1       2            3          4           5           6...inf
+// ----------------------------------- BUILD ------------------------------------- //
+// ./trove      -f      <filename>   -b         -l          <length>    <filelist>
+// ./trove      -f      <filename>   -b         <filelist>
+// ./trove      -b      -l           <length>   <filelist>
+// ./trove      -b      <filelist>
+// ----------------------------------- UPDATE ------------------------------------- //
+// ./trove      -f      <filename>   -u         -l          <length>    <filelist>
+// ./trove      -f      <filename>   -u         <filelist>
+// ./trove      -u      -l           <length>   <filelist>
+// ./trove      -u      <filelist>
+// ----------------------------------- REMOVE ------------------------------------- //
+// ./trove      -f      <filename>   -r         -l          <length>    <filelist>
+// ./trove      -f      <filename>   -r         <filelist>
+// ./trove      -r      -l           <length>   <filelist>
+// ./trove      -r      <filelist>
+// -------------------------------- WORD RETRIEVE --------------------------------- //
+// ./trove      -f      <filename>   <word>
+// ./trove      <word>
