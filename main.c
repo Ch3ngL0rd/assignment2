@@ -138,7 +138,7 @@ void ht_set(ht_t *hashtable, const char *key, const char *value)
             temp = (char *)malloc(newlen);
 
             strcpy(temp, entry->value);
-            strcat(temp, " ");
+            strcat(temp, " "); // Change to "\0"
             strcat(temp, value);
 
             // free(entry->value);
@@ -430,14 +430,14 @@ void search_word(char *filename, char *word)
             // Retrieve the next value which will be the absolute paths
             read = getline(&line, &len, f);
             line[strcspn(line, "\n")] = 0;
-            printf("%s", line);
+            printf("%s\n", line);
         }
     }
 
     fclose(f);
     if (line)
         free(line);
-    exit(EXIT_SUCCESS);
+    // exit(EXIT_SUCCESS);
 }
 
 // ------------------------------------------------------------------------ //
@@ -448,25 +448,129 @@ void search_word(char *filename, char *word)
 
 int main(int argc, char *argv[])
 {
-    int min_len = 4;
-    // --------------- CREATION OF HASHMAP ------------- //
-    ht = ht_create();
+    // Cases
+    // 0            1       2            3          4           5           6...inf
+    // ----------------------------------- BUILD ------------------------------------- //
+    // ./trove      -f      <filename>   -b         -l          <length>    <filelist>
+    // ./trove      -f      <filename>   -b         <filelist>
+    // ./trove      -b      -l           <length>   <filelist>
+    // ./trove      -b      <filelist>
+    // ----------------------------------- UPDATE ------------------------------------- //
+    // ./trove      -f      <filename>   -u         -l          <length>    <filelist>
+    // ./trove      -f      <filename>   -u         <filelist>
+    // ./trove      -u      -l           <length>   <filelist>
+    // ./trove      -u      <filelist>
+    // ----------------------------------- REMOVE ------------------------------------- //
+    // ./trove      -f      <filename>   -r         -l          <length>    <filelist>
+    // ./trove      -f      <filename>   -r         <filelist>
+    // ./trove      -r      -l           <length>   <filelist>
+    // ./trove      -r      <filelist>
+    // -------------------------------- WORD RETRIEVE --------------------------------- //
+    // ./trove      -f      <filename>   <word>
+    // ./trove      <word>
 
-    //-------------RECURSIVE FILE SEARCH--------------- //
-    file_search(argv[1], min_len);
+    int opt;
+    int min_len = 4; // default minimum length
+    char *filename = (char *)malloc(strlen("trove") + 1);
+    strcpy(filename, "trove");
 
-    // ht_dump(ht);
-    // Proves that works for collisions! - TABLE SIZE 10,000
-    // 1. Set table number to 10,000 and find print statement from ht_dump where there
-    // is a collision
-    // 2. Use the ht_get function - this will show we can still retrieve the value as it
-    // is set up as a linkedlist
-    // printf("%s\n", ht_get(ht, "DECLARE"));
-    // printf("%s\n", ht_get(ht, "Instead")); // these two have the same hash value - check SLOT 9348
+    if (argc < 2)
+    {
+        printf("\nUsage: ./trove [-f filename] [-b | -r | -u] [-l length] filelist\nor     ./trove [-f filename] word\n\nwhere options are:\n-b		build a new trove-file\n-f filename	provide the name of the trove-file to be built or searched\n-l length	specify the minimum-length of words added to the trove-file\n-r		remove information from the trove-file\n-u		update information in the trove-file\n\n");
+        exit(EXIT_FAILURE);
+    }
 
-    build_trove(ht);
+    while ((opt = getopt(argc, argv, "f:l:r:u:b:")) != -1)
+    {
+        switch (opt)
+        {
+        case 'f':
+            // Need to check get the filename
+            filename = (char *)realloc(filename, strlen(optarg) + 1);
+            strcpy(filename, optarg);
+            printf("%s\n", filename);
+            printf("The trove-file name to be build or searched is: %s\n", optarg);
+            break;
+        case 'l':
+            // Get the length from the arguments
+            min_len = atoi(optarg);
+            printf("The min length passed in is %d\n", min_len);
+            break;
+        case 'r':
+            // Retrieve the first argument for filename
+            printf("The first argument is: %s\n", optarg);
+            // Retrieve the extra arguments of filenames if any
+            for (; optind < argc; optind++)
+            {
+                printf("The extra arguments are: %s\n", argv[optind]);
+            }
+            break;
+        case 'u':
+            printf("The first argument is: %s\n", optarg);
+            // Retrieve the extra arguments of filenames if any
+            for (; optind < argc; optind++)
+            {
+                printf("The extra arguments are: %s\n", argv[optind]);
+            }
+            break;
+        case 'b':
+            printf("The first argument is: %s\n", optarg);
+            // Retrieve the extra arguments of filenames if any
+            break;
+        case '?':
+            printf("Invalid argument!\n");
+            break;
+        default:
+            printf("ERROR!!\n");
+            break;
+        }
+    }
 
-    search_word("trove-file.txt", "hello");
+    for (; optind < argc; optind++)
+    {
+        printf("The extra arguments are: %s\n", argv[optind]);
+    }
+
+    // if no other arguments are passed in then we will have the filename
+    // either "trove" OR the cl option passed in with the -f flag
+    // this means we are searching for the next
+
+    // Remove filename from memory
+    free(filename);
 
     return 0;
+
+    // File output
+    // printf("%s\n", *argv);
 }
+
+// ------------------------------ DEBUG CODE ------------------------------- //
+
+// int min_len = 4;
+// // --------------- CREATION OF HASHMAP ------------- //
+// ht = ht_create();
+
+// //-------------RECURSIVE FILE SEARCH--------------- //
+// file_search(argv[1], min_len);
+
+// // ht_dump(ht);
+// // Proves that works for collisions! - TABLE SIZE 10,000
+// // 1. Set table number to 10,000 and find print statement from ht_dump where there
+// // is a collision
+// // 2. Use the ht_get function - this will show we can still retrieve the value as it
+// // is set up as a linkedlist
+// // printf("%s\n", ht_get(ht, "DECLARE"));
+// // printf("%s\n", ht_get(ht, "Instead")); // these two have the same hash value - check SLOT 9348
+
+// build_trove(ht);
+
+// search_word("trove-file.txt", "hello");
+
+// char buffer[PATH_MAX]; // Get the new absolute path to pass into function for recursive file search
+// char *abs_path = realpath("/tmp", buffer);
+
+// // char const *folder = getenv("TMPDIR");
+// // if (folder == 0)
+// //     folder = "/tmp";
+
+// printf("%s\n", buffer);
