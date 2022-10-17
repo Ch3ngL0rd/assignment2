@@ -394,9 +394,19 @@ void is_dir(char *base_path, int min_len)
 // ------------------------------------------------------------------------ //
 
 // Build Trove file
-void build_trove(ht_t *hashtable)
+void build_trove(ht_t *hashtable, char *basePath)
 {
-    FILE *f = fopen("trove-file.txt", "wb");
+
+    char path[PATH_MAX];
+    char *res = realpath(basePath, path);
+
+    printf("%s\n", path);
+
+    // open directory
+    struct stat st;
+    stat(path, &st);
+
+    FILE *f = fopen(path, "wb");
     if (f == NULL)
     {
         printf("Error opening file!\n");
@@ -480,7 +490,6 @@ int main(int argc, char *argv[])
 
     // Dynamically allocating space for the filename incase this changes via a commandline input
     char *filename = (char *)malloc(strlen("trove") + 1);
-    strcpy(filename, "trove");
 
     // Create the hashtable
     ht = ht_create();
@@ -503,7 +512,7 @@ int main(int argc, char *argv[])
             strcpy(filename, optarg);
 
             // Debug code
-            // printf("The trove-file name to be build or searched is: %s\n", filename);
+            printf("The trove-file name to be built or searched is: %s\n", filename);
             break;
         case 'l':
             // Get the length from the arguments
@@ -516,7 +525,7 @@ int main(int argc, char *argv[])
             }
 
             // Debug code
-            // printf("The min length passed in is %d\n", min_len);
+            printf("The min length passed in is %d\n", min_len);
             break;
         case 'r':
             // Retrieve the first argument for filename from list of files
@@ -544,7 +553,34 @@ int main(int argc, char *argv[])
             {
                 is_dir(argv[optind], min_len);
             }
-            ht_dump(ht);
+            // ht_dump(ht);
+
+            // Trove file handler
+            if (strlen(filename) == 0)
+            {
+                printf("The trove-file name to be built or searched is: trove\n");
+                // Go into the tmp directory
+                // save file as trove
+                build_trove(ht, "/tmp/trove");
+            }
+            else
+            {
+                char *path;
+                if ((path = malloc(strlen("./") + strlen(filename) + 1)) != NULL)
+                {
+                    path[0] = '\0';
+                    strcat(path, "./");
+                    strcat(path, filename);
+                    build_trove(ht, path);
+                }
+                else
+                {
+                    // Error message...
+                }
+
+                free(path);
+            }
+
             break;
         case '?':
             printf("Invalid argument!\n");
