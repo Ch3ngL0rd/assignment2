@@ -442,20 +442,6 @@ void build_trove(ht_t *hashtable, char *basePath)
     fclose(f);
 }
 
-// Removes string - copy and paste from stack overflow - will need to refactor this
-void strremove(char *str, const char *sub)
-{
-    size_t len = strlen(sub);
-    if (len > 0)
-    {
-        char *p = str;
-        while ((p = strstr(p, sub)) != NULL)
-        {
-            memmove(p, p + len, strlen(p + len) + 1);
-        }
-    }
-}
-
 // Remove absolute path from the line
 // Append to new file
 // Delete old file
@@ -465,17 +451,15 @@ void strremove(char *str, const char *sub)
 // via the -f flag
 void delete_path(char *filename, char *path)
 {
-    FILE *filein = fopen(filename, "r");
-    FILE *fileout = fopen("temp", "w");
+    FILE *filein = fopen(filename, "r"); // file we are searching line by line
+    FILE *fileout = fopen("temp", "w");  // file we are writing to
     char abs_path[PATH_MAX];
-    char *res = realpath(path, abs_path);
+    char *res = realpath(path, abs_path); // realpath fills the abs_path buffer
 
     // Concatenated path with "\"
     char *concat_path = (char *)malloc(strlen(abs_path) + 2);
     strcat(concat_path, "\\");
     strcat(concat_path, abs_path);
-
-    // printf("%s\n", abs_path);
 
     if (filein == NULL || fileout == NULL)
     {
@@ -487,41 +471,44 @@ void delete_path(char *filename, char *path)
     size_t len = 0;
     ssize_t read;
 
-    // Getting the line
+    // Debug seeing if it drops any words from file
+    int countin = 0;
+    int countout = 0;
+
     while ((read = getline(&line, &len, filein)) != -1)
     {
-        char *new_line;
+
         char *token;
         token = strtok(line, "\\");
-        new_line = (char *)malloc(strlen(token) + 1);
-        strcat(new_line, token);
+        char new_line[10000]; // Dynamic won't work for some reason...
+        strcpy(new_line, token);
 
         // Get the absolute path value and then enter while loop
         token = strtok(NULL, "\\");
-        // printf("%s\n", token);
-
+        countin++;
         while (token != NULL)
         {
             if (!(strstr(token, abs_path)))
             {
-                // printf("%s\n", token);
-                new_line = (char *)realloc(new_line, strlen(new_line) + strlen(token) + 2);
                 strcat(new_line, "\\");
                 strcat(new_line, token);
             }
             token = strtok(NULL, "\\");
         }
-        printf("%s\n", new_line);
 
         if (strstr(new_line, "\\"))
         {
+            countout++;
             // Add string to file out
             fprintf(fileout, "%s", new_line);
         }
     }
 
+    printf("Number of lines file in: %-30d Number of lines file out: %d\n", countin, countout);
+
     // Freeing memory and closing files
     free(concat_path);
+    // free(new_line);
     if (line)
         free(line);
     fclose(filein);
@@ -532,8 +519,6 @@ void delete_path(char *filename, char *path)
 
     // Change temp file to existing filename
     rename("temp", filename);
-
-    // Success
 }
 
 // Search trove file for word
