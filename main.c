@@ -24,6 +24,8 @@ void dir_search(char *basePath, int min_len);
 void scan_file(char *abs_path, int min_len);
 void is_dir(char *base_path, int min_len);
 
+void delete_path(char *filename, char *path);
+
 typedef struct entry_t
 {
     char *key;
@@ -136,7 +138,7 @@ void ht_set(ht_t *hashtable, const char *key, const char *value)
             temp = (char *)malloc(newlen);
 
             strcpy(temp, entry->value);
-            strcat(temp, " "); // Change to "\0"
+            strcat(temp, "\\");
             strcat(temp, value);
 
             entry->value = realloc(entry->value, newlen);
@@ -337,7 +339,6 @@ void dir_search(char *basePath, int min_len)
                 }
                 else
                 {
-                    FILE *f = fopen(path, "rb");
                     scan_file(path, min_len);
                 }
             }
@@ -380,7 +381,7 @@ void is_dir(char *base_path, int min_len)
         }
         else
         {
-            // If command line argument is a file - we will pass the bugger into scan_file
+            // If command line argument is a file - we will pass the buffer into scan_file
             // and this will add the words to the hashtable
             scan_file(buffer, min_len);
         }
@@ -422,12 +423,13 @@ void build_trove(ht_t *hashtable, char *basePath)
             continue;
         }
 
+        // Change to while(true)
         for (;;)
         {
             // printf("%s=%s ", entry->key, entry->value);
 
-            fprintf(f, "%s\n", entry->key);
-            fprintf(f, "%s\n", entry->value);
+            fprintf(f, "%s\\%s\n", entry->key, entry->value);
+            // fprintf(f, "%s\n", );
 
             if (entry->next == NULL)
             {
@@ -440,10 +442,105 @@ void build_trove(ht_t *hashtable, char *basePath)
     fclose(f);
 }
 
+// Removes string - copy and paste from stack overflow - will need to refactor this
+void strremove(char *str, const char *sub)
+{
+    size_t len = strlen(sub);
+    if (len > 0)
+    {
+        char *p = str;
+        while ((p = strstr(p, sub)) != NULL)
+        {
+            memmove(p, p + len, strlen(p + len) + 1);
+        }
+    }
+}
+
+// Remove absolute path from the line
+// Append to new file
+// Delete old file
+// Copy name to new file
+// NOTE - THIS ASSUMPTION IS THAT THE FILE WILL BE IN THE SAME DIRECTORY AS ./trove EXECUTABLE
+// ^^ this makes sense because we are passing into the command line one single file not an absolute path to the file
+// via the -f flag
+void delete_path(char *filename, char *path)
+{
+    FILE *filein = fopen(filename, "r");
+    FILE *fileout = fopen("temp", "w");
+    char abs_path[PATH_MAX];
+    char *res = realpath(path, abs_path);
+
+    // Concatenated path with "\"
+    char *concat_path = (char *)malloc(strlen(abs_path) + 2);
+    strcat(concat_path, "\\");
+    strcat(concat_path, abs_path);
+
+    // printf("%s\n", abs_path);
+
+    if (filein == NULL || fileout == NULL)
+    {
+        printf("Error opening file!\n");
+        exit(1);
+    }
+
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    // Getting the line
+    while ((read = getline(&line, &len, filein)) != -1)
+    {
+        char *new_line;
+        char *token;
+        token = strtok(line, "\\");
+        new_line = (char *)malloc(strlen(token) + 1);
+        strcat(new_line, token);
+
+        // Get the absolute path value and then enter while loop
+        token = strtok(NULL, "\\");
+        // printf("%s\n", token);
+
+        while (token != NULL)
+        {
+            if (!(strstr(token, abs_path)))
+            {
+                // printf("%s\n", token);
+                new_line = (char *)realloc(new_line, strlen(new_line) + strlen(token) + 2);
+                strcat(new_line, "\\");
+                strcat(new_line, token);
+            }
+            token = strtok(NULL, "\\");
+        }
+        printf("%s\n", new_line);
+
+        if (strstr(new_line, "\\"))
+        {
+            // Add string to file out
+            fprintf(fileout, "%s", new_line);
+        }
+    }
+
+    // Freeing memory and closing files
+    free(concat_path);
+    if (line)
+        free(line);
+    fclose(filein);
+    fclose(fileout);
+
+    // Delete old file with absolute path
+    remove(filename); // do we need a check here?
+
+    // Change temp file to existing filename
+    rename("temp", filename);
+
+    // Success
+}
+
 // Search trove file for word
+// Prints out the absolute paths corresponding to the word
 void search_word(char *filename, char *word)
 {
-    FILE *f = fopen("trove-file.txt", "rb");
+    FILE *f = fopen(filename, "rb");
     char *line = NULL;
     size_t len = 0;
     ssize_t read;
@@ -459,12 +556,19 @@ void search_word(char *filename, char *word)
         // printf("Retrieved line of length %zu:\n", read);
         // printf("%s", line);
         line[strcspn(line, "\n")] = 0;
-        if (strcmp(line, word) == 0)
+        const char s[2] = "\\";
+        char *token;
+
+        // AT THE MOMENT THIS RETURNS THE WORD AS WELL AS THE ABSOLUTE PATHS
+
+        token = strtok(line, s);
+        if (strcmp(token, word) == 0)
         {
-            // Retrieve the next value which will be the absolute paths
-            read = getline(&line, &len, f);
-            line[strcspn(line, "\n")] = 0;
-            printf("%s\n", line);
+            while (token != NULL)
+            {
+                printf("%s\n", token);
+                token = strtok(NULL, s);
+            }
         }
     }
 
@@ -510,9 +614,6 @@ int main(int argc, char *argv[])
             // Reallocate the memory to = the length of the filename passed in + 1 for the null byte
             filename = (char *)realloc(filename, strlen(optarg) + 1);
             strcpy(filename, optarg);
-
-            // Debug code
-            printf("The trove-file name to be built or searched is: %s\n", filename);
             break;
         case 'l':
             // Get the length from the arguments
@@ -523,18 +624,18 @@ int main(int argc, char *argv[])
                 printf("Must provide a positive integer for -l argument!");
                 return EXIT_FAILURE;
             }
-
-            // Debug code
-            printf("The min length passed in is %d\n", min_len);
             break;
         case 'r':
-            // Retrieve the first argument for filename from list of files
-            printf("The first argument is: %s\n", optarg);
-            // Retrieve the extra arguments of filenames if any
+            // Checking if first argument is a directory or not
+            // inside of is_dir, if it is, then we traverse through the dictionary and delete
+            // printf("%s\n", optarg);
+            delete_path(filename, optarg);
             for (; optind < argc; optind++)
             {
-                printf("The extra arguments are: %s\n", argv[optind]);
+                delete_path(filename, argv[optind]);
             }
+            free(filename);
+            exit(EXIT_SUCCESS);
             break;
         case 'u':
             // Retrieve the first argument for filename from list of files
@@ -544,17 +645,16 @@ int main(int argc, char *argv[])
             {
                 printf("The extra arguments are: %s\n", argv[optind]);
             }
+            free(filename);
+            exit(EXIT_SUCCESS);
             break;
         case 'b':
             // Retrieve the first argument for filename from list of files
-            printf("The first argument is: %s\n", optarg);
             is_dir(optarg, min_len);
             for (; optind < argc; optind++)
             {
                 is_dir(argv[optind], min_len);
             }
-            // ht_dump(ht);
-
             // Trove file handler
             if (strlen(filename) == 0)
             {
@@ -577,10 +677,10 @@ int main(int argc, char *argv[])
                 {
                     // Error message...
                 }
-
                 free(path);
             }
-
+            free(filename);
+            exit(EXIT_SUCCESS);
             break;
         case '?':
             printf("Invalid argument!\n");
@@ -591,8 +691,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Remove filename from memory
-    free(filename);
+    // Read through trove file test
+    search_word("trove-file", "main");
 
     return 0;
 }
