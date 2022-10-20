@@ -18,6 +18,12 @@
 // ------------------------------------------------------------------------ //
 
 #define TABLE_SIZE 100000
+#define CHECK_ALLOC(p)      \
+    if (p == NULL)          \
+    {                       \
+        perror(__func__);   \
+        exit(EXIT_FAILURE); \
+    }
 
 // Function declarations
 void dir_search(char *basePath, int min_len);
@@ -355,6 +361,8 @@ void scan_file(char *abs_path, int min_len)
     fclose(f);
 }
 
+// Helper function for update method
+
 // This function is used when we first check to see if a command line argument is a file or a directory
 // If it is a FILE, then we simply scan the file and add the words to the hashtable
 // If it is a DIRECTORY, we call dir_search and pass in the absolute path for the commandline argument
@@ -480,7 +488,7 @@ void delete_path(char *filename, char *path)
 
         char *token;
         token = strtok(line, "\\");
-        char new_line[10000]; // Dynamic won't work for some reason...
+        char new_line[100000]; // Dynamic won't work for some reason...
         strcpy(new_line, token);
 
         // Get the absolute path value and then enter while loop
@@ -563,6 +571,62 @@ void search_word(char *filename, char *word)
     // exit(EXIT_SUCCESS);
 }
 
+void update_trove(char *trove_path, char *update_path)
+{
+    // Retrieve first word in update file
+    // Search for first word in trovefile
+    // If doesn't exist
+    // Append line of update_file to the trove_file
+    // If does exist:
+    // use strtok to split the line in update_file
+    // check if the line split strstr(token , line) - token occurs in line
+    // if it doesnt... append to line somehow
+    // if it does, do nothing
+    // continue to next token
+    char abs_trove[PATH_MAX];
+    char abs_update[PATH_MAX];
+    char *res1 = realpath(trove_path, abs_trove);
+    char *res2 = realpath(update_path, abs_update); // Absolute path so will reference the current relative path trove is called
+
+    FILE *troveptr = fopen(abs_trove, "r+");
+    FILE *updateptr = fopen(abs_update, "r");
+    // NEED TO DO A CHECK FOR FAILURE TO OPEN
+
+    char *line_update = NULL;
+    size_t len_update = 0;
+    ssize_t read_update;
+
+    while ((read_update = getline(&line_update, &len_update, updateptr)) != -1)
+    {
+        // Retrieve the first word from the line
+        char *token_update = strtok(line_update, "\\");
+
+        char *line_trove = NULL;
+        size_t len_trove = 0;
+        ssize_t read_trove;
+        // Read lines of trove file to see if word exists
+        while ((read_trove = getline(&line_trove, &len_trove, troveptr)) != -1)
+        {
+            // Retrieve first word from the line of trove file
+            char *token_trove = strtok(line_trove, "\\");
+
+            // If first word of trove file == first word of update file....
+            // while (token_trove != NULL)
+            // {
+            //     printf("%s\n", token_trove);
+            //     token_trove = strtok(NULL, "\\");
+            // }
+
+            if (strcmp(token_trove, token_update) == 0)
+            {
+                // come back to this
+            }
+        }
+    }
+
+    printf("Trove path: %s\t Update_path: %s\n", abs_trove, abs_update);
+}
+
 // ------------------------------------------------------------------------ //
 // ------------------------------------------------------------------------ //
 // --------------------------------MAIN------------------------------------ //
@@ -579,9 +643,6 @@ int main(int argc, char *argv[])
 
     // Dynamically allocating space for the filename incase this changes via a commandline input
     char *filename = (char *)malloc(strlen("trove") + 1);
-
-    // Create the hashtable
-    ht = ht_create();
 
     // Check to see if no arguments have been passed in and returns a statement
     // prompting the user how to use ./trove
@@ -623,18 +684,33 @@ int main(int argc, char *argv[])
             exit(EXIT_SUCCESS);
             break;
         case 'u':
-            // Retrieve the first argument for filename from list of files
-            printf("The first argument is: %s\n", optarg);
-            // Retrieve the extra arguments of filenames if any
+            // Create the hashtable
+            ht = ht_create();
+
+            // Add to the hashtable
+            is_dir(optarg, min_len);
             for (; optind < argc; optind++)
             {
-                printf("The extra arguments are: %s\n", argv[optind]);
+                is_dir(argv[optind], min_len);
             }
+            // Build the temp trove file
+            build_trove(ht, "temp-update");
+
+            if (strlen(filename) == 0)
+            {
+                update_trove("/tmp/trove", "temp-update");
+            }
+            else
+            {
+                update_trove(filename, "temp-update");
+            }
+
             free(filename);
             exit(EXIT_SUCCESS);
             break;
         case 'b':
             // Retrieve the first argument for filename from list of files
+            ht = ht_create();
             is_dir(optarg, min_len);
             for (; optind < argc; optind++)
             {
