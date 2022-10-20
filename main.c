@@ -409,8 +409,6 @@ void build_trove(ht_t *hashtable, char *basePath)
     char path[PATH_MAX];
     char *res = realpath(basePath, path);
 
-    printf("%s\n", path);
-
     // open directory
     struct stat st;
     stat(path, &st);
@@ -592,69 +590,54 @@ void update_trove(char *trove_path, char *update_path)
     FILE *updateptr = fopen(abs_update, "r");
     // NEED TO DO A CHECK FOR FAILURE TO OPEN
 
-    char *line_update = NULL;
-    size_t len_update = 0;
-    ssize_t read_update;
+    char *line_trove = NULL;
+    size_t len_trove = 0;
+    ssize_t read_trove;
 
-    while ((read_update = getline(&line_update, &len_update, updateptr)) != -1)
+    while ((read_trove = getline(&line_trove, &len_trove, troveptr)) != -1)
     {
-        // Retrieve the first word from the line
-        char *token_update = strtok(line_update, "\\");
+        // // Retrieve the first word from the line
+        // Make a copy of line_trove for the strtok to be used on
+        char *tmp1 = (char *)malloc(len_trove + 1);
+        strcpy(tmp1, line_trove);
+        char *token_trove = strtok(tmp1, "\\");
 
-        // Need a flag to check if word is not found??
-
-        char *line_trove = NULL;
-        size_t len_trove = 0;
-        ssize_t read_trove;
-        // Read lines of trove file to see if word exists
-        while ((read_trove = getline(&line_trove, &len_trove, troveptr)) != -1)
+        char *line_update = NULL;
+        size_t len_update = 0;
+        ssize_t read_update;
+        while ((read_trove = getline(&line_update, &len_update, updateptr)) != -1)
         {
-            // Retrieve first word from the line of trove file
-            char *token_trove = strtok(line_trove, "\\");
+            char *tmp2 = (char *)malloc(len_update + 1);
+            strcpy(tmp2, line_update);
+            char *token_update = strtok(tmp2, "\\");
 
-            // If first word of trove file == first word of update file....
-            // while (token_trove != NULL)
-            // {
-            //     printf("%s\n", token_trove);
-            //     token_trove = strtok(NULL, "\\");
-            // }
             if (strcmp(token_trove, token_update) == 0)
             {
-                char buffer[1000];
-                memcpy(buffer, line_trove, len_trove);
-                char *new_token = strtok(buffer, "\\");
-                while (new_token != NULL)
+                printf("------------------------------------------\n");
+                printf("This is the trove line: %s", line_trove);
+                printf("This is the word we are comparing from trove: %s\n", token_trove);
+                printf("This is the word we are comparing from update: %s\n\n", token_update);
+                printf("Successfully found word... scanning through now:\n");
+
+                // Scan through to next absolute path
+                token_update = strtok(NULL, "\\");
+                while (token_update != NULL)
                 {
-                    printf("%s\n", new_token);
-                    new_token = strtok(NULL, "\\");
+                    if (!strstr(line_trove, token_update))
+                    {
+                        // Absolute path not found so append to file
+                        printf("The file path: %s does not appear in trove file - append to end of line!\n\n", token_update);
+                        // fprintf(troveptr, "%s", "TESTING!");
+                    }
+
+                    token_update = strtok(NULL, "\\");
                 }
-                // printf("%s\n", buffer);
             }
-
-            // if (strcmp(token_trove, token_update) == 0)
-            // {
-            //     // Scan through the absolute paths and add them to the end of the trove file
-            //     // May need to remove the \n character using similar function to below
-            //     // get next absolute path
-            //     printf("%s\n", token_update);
-            //     token_update = strtok(NULL, "\\");
-            //     while (token_update != NULL)
-            //     {
-            //         // See if absolute path already occurs in the line_trove
-            //         printf("%s\n", token_update);
-            //         token_update = strtok(NULL, "\\");
-            //     }
-            // }
-            // else
-            // {
-            //     // Word not the same
-            //     continue;
-            // }
+            free(tmp2);
         }
-        rewind(troveptr);
+        free(tmp1);
+        rewind(updateptr);
     }
-
-    printf("Trove path: %s\t Update_path: %s\n", abs_trove, abs_update);
 }
 
 // ------------------------------------------------------------------------ //
