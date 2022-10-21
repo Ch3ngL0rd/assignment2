@@ -16,11 +16,10 @@ void build_trove(ht_t *hashtable, char *basePath)
     // open directory
     struct stat st;
     stat(path, &st);
-
     FILE *f = fopen(path, "wb");
     if (f == NULL)
     {
-        printf("Error opening file!\n");
+        printf("Error opening trove file!\n");
         exit(1);
     }
 
@@ -33,8 +32,10 @@ void build_trove(ht_t *hashtable, char *basePath)
             continue;
         }
 
-        while (true)
+        // Change to while(true)
+        for (;;)
         {
+            // printf("%s=%s ", entry->key, entry->value);
 
             fprintf(f, "%s\\%s\n", entry->word, entry->path);
             // fprintf(f, "%s\n", );
@@ -138,6 +139,7 @@ void search_word(char *filename, char *word)
     size_t len = 0;
     ssize_t read;
 
+    printf("Searching word.\n");
     if (f == NULL)
     {
         printf("Error opening file!\n");

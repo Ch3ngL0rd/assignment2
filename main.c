@@ -1,5 +1,5 @@
 //  CITS2002 Project 2 2022
-//  Student1:   STUDENT-NUMBER1   FAMILY-NAME   FIRST-NAME   CONTRIBUTION
+//  Student1:   23258325   CAPELLI   KYLE   50
 //  Student2:   23279828   CHENG   ZACHARY   50
 
 #include <stdio.h>
@@ -39,6 +39,12 @@ int main(int argc, char *argv[])
     {
         printf("\nUsage: ./trove [-f filename] [-b | -r | -u] [-l length] filelist\nor     ./trove [-f filename] word\n\nwhere options are:\n-b		build a new trove-file\n-f filename	provide the name of the trove-file to be built or searched\n-l length	specify the minimum-length of words added to the trove-file\n-r		remove information from the trove-file\n-u		update information in the trove-file\n\n");
         exit(EXIT_FAILURE);
+    }
+    for (int i = 1; i < argc; i++) {
+        int argv_len = strlen(argv[i]);
+        for (int j = 0; j < argv_len; j++) {
+
+        }
     }
 
     while ((opt = getopt(argc, argv, "f:l:r:u:b:")) != -1)
@@ -142,9 +148,8 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
             break;
         }
-        // If it makes it to this point we have just -f filename [arg] where arg will be the word
-        search_word(filename, argv[argc - 1]);
     }
+    search_word(filename, argv[argc - 1]);
 
     return 0;
 }
