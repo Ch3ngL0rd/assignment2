@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "dirent.h": "c",
+        "trove_utilities.h": "c"
+    }
+}
