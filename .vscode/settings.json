@@ -1,6 +1,28 @@
 {
     "files.associations": {
         "dirent.h": "c",
-        "trove_utilities.h": "c"
+        "trove_utilities.h": "c",
+        "hashtable.h": "c",
+        "global.h": "c",
+        "__bit_reference": "c",
+        "__node_handle": "c",
+        "bitset": "c",
+        "chrono": "c",
+        "__memory": "c",
+        "limits": "c",
+        "optional": "c",
+        "ratio": "c",
+        "system_error": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "vector": "c",
+        "__functional_base": "c",
+        "algorithm": "c",
+        "functional": "c",
+        "iterator": "c",
+        "memory": "c",
+        "atomic": "c",
+        "cstddef": "c",
+        "locale": "c"
     }
 }

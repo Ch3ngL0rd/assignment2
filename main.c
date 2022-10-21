@@ -117,6 +117,7 @@ int main(int argc, char *argv[])
                     path[0] = '\0';
                     strcat(path, "./");
                     strcat(path, filename);
+                    printf("Path is %s\n",path);
                     build_trove(ht, path);
                 }
                 else

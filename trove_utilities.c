@@ -33,12 +33,10 @@ void build_trove(ht_t *hashtable, char *basePath)
             continue;
         }
 
-        // Change to while(true)
-        for (;;)
+        while (true)
         {
-            // printf("%s=%s ", entry->key, entry->value);
 
-            fprintf(f, "%s\\%s\n", entry->key, entry->value);
+            fprintf(f, "%s\\%s\n", entry->word, entry->path);
             // fprintf(f, "%s\n", );
 
             if (entry->next == NULL)

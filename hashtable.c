@@ -2,20 +2,6 @@
 #include <stdlib.h>
 #include "global.h"
 #include "hashtable.h"
-// typedef struct entry_t
-// {
-//     char *key;
-//     char *value;
-//     struct entry_t *next;
-// } entry_t;
-
-// typedef struct
-// {
-//     entry_t **entries;
-// } ht_t;
-
-// typedef struct ht_t ht_t;
-
 
 // Hash function for string
 unsigned int hash(const char *key)
@@ -37,16 +23,16 @@ unsigned int hash(const char *key)
 }
 
 // Creates an entry for hashtable
-entry_t *ht_pair(const char *key, const char *value)
+entry_t *ht_pair(const char *word, const char *path)
 {
     // Allocate memory for struct & struct values
     entry_t *entry = malloc(sizeof(entry_t));
-    entry->key = malloc(strlen(key) + 1);
-    entry->value = malloc(strlen(value) + 1); // THIS NEEDS TO BE CHANGED
+    entry->word = malloc(strlen(word) + 1);
+    entry->path = malloc(strlen(path) + 1); // THIS NEEDS TO BE CHANGED
 
     // Assign values
-    strcpy(entry->key, key);
-    strcpy(entry->value, value);
+    strcpy(entry->word, word);
+    strcpy(entry->path, path);
 
     // next starts out NULL but may be set later on
     entry->next = NULL;
@@ -71,9 +57,9 @@ ht_t *ht_create(void)
 
 // Sets a key-value pair for a hashtable
 // Hash collision is resolved by linear probing
-void ht_set(ht_t *hashtable, const char *key, const char *value)
+void ht_set(ht_t *hashtable, const char *word, const char *path)
 {
-    unsigned int slot = hash(key);
+    unsigned int slot = hash(word);
 
     entry_t *entry = hashtable->entries[slot];
 
@@ -81,10 +67,10 @@ void ht_set(ht_t *hashtable, const char *key, const char *value)
     // Returns if hashtable contains string
     if (entry == NULL)
     {
-        hashtable->entries[slot] = ht_pair(key, value);
+        hashtable->entries[slot] = ht_pair(word, path);
         return;
     }
-    else if (strstr(entry->value, value))
+    else if (strstr(entry->path, path))
     {
         return;
     }
@@ -94,31 +80,31 @@ void ht_set(ht_t *hashtable, const char *key, const char *value)
     // Linear probe until null entry is found
     while (entry != NULL)
     {
-        if (strcmp(entry->key, key) == 0)
+        if (strcmp(entry->word, word) == 0)
         {
             char *temp;
             size_t newlen;
 
-            newlen = strlen(entry->value) + strlen(value) + 2;
+            newlen = strlen(entry->path) + strlen(path) + 2;
             temp = (char *)malloc(newlen);
 
-            strcpy(temp, entry->value);
+            strcpy(temp, entry->path);
             strcat(temp, " ");
-            strcat(temp, value);
+            strcat(temp, path);
 
-            entry->value = realloc(entry->value, newlen);
-            strcpy(entry->value, temp);
+            entry->path = realloc(entry->path, newlen);
+            strcpy(entry->path, temp);
             return;
         }
         prev = entry;
         entry = prev->next;
     }
 
-    prev->next = ht_pair(key,value);
+    prev->next = ht_pair(word,path);
 }
 
-char *ht_get(ht_t *hashtable, const char *key) {
-    unsigned int slot = hash(key);
+char *ht_get(ht_t *hashtable, const char *word) {
+    unsigned int slot = hash(word);
 
     entry_t *entry = hashtable->entries[slot];
 
@@ -129,8 +115,8 @@ char *ht_get(ht_t *hashtable, const char *key) {
 
     // Linear probe until key is found
     while (entry != NULL) {
-        if (strcmp(entry->key,key) == 0) {
-            return entry->value;
+        if (strcmp(entry->word,word) == 0) {
+            return entry->path;
         }
         entry = entry->next;
     }
