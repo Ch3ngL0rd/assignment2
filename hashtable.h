@@ -1,3 +1,5 @@
+// Source: https://benhoyt.com/writings/hash-table-in-c/    
+
 #pragma once
 
 typedef struct entry_t

@@ -12,7 +12,7 @@ void build_trove(ht_t *hashtable, char *basePath)
 {
 
     char path[PATH_MAX];
-
+    realpath(basePath, path);
     // open directory
     struct stat st;
     stat(path, &st);
@@ -62,6 +62,7 @@ void delete_path(char *filename, char *path)
     FILE *filein = fopen(filename, "r"); // file we are searching line by line
     FILE *fileout = fopen("temp", "w");  // file we are writing to
     char abs_path[PATH_MAX];
+    realpath(path, abs_path);
 
     // Concatenated path with "\"
     char *concat_path = (char *)malloc(strlen(abs_path) + 2);
@@ -175,6 +176,9 @@ void update_trove(char *trove_path, char *update_path)
 {
     char abs_trove[PATH_MAX];
     char abs_update[PATH_MAX];
+
+    realpath(trove_path, abs_trove);
+    realpath(update_path, abs_update);
 
     FILE *troveptr = fopen(abs_trove, "r+");
     FILE *updateptr = fopen(abs_update, "r");

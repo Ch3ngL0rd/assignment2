@@ -1,3 +1,7 @@
+//  CITS2002 Project 2 2022
+//  Student1:   STUDENT-NUMBER1   FAMILY-NAME   FIRST-NAME   CONTRIBUTION
+//  Student2:   23279828   CHENG   ZACHARY   50
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

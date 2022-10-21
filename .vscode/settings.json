@@ -23,6 +23,7 @@
         "memory": "c",
         "atomic": "c",
         "cstddef": "c",
-        "locale": "c"
+        "locale": "c",
+        "ctype.h": "c"
     }
 }
