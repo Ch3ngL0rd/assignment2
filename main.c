@@ -555,6 +555,7 @@ void search_word(char *filename, char *word)
         token = strtok(line, s);
         if (strcmp(token, word) == 0)
         {
+            token = strtok(NULL, s);
             while (token != NULL)
             {
                 printf("%s\n", token);
@@ -809,7 +810,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    // Error message...
+                    exit(EXIT_FAILURE);
                 }
                 free(path);
             }
@@ -818,45 +819,16 @@ int main(int argc, char *argv[])
             break;
         case '?':
             printf("Invalid argument!\n");
+            exit(EXIT_FAILURE);
             break;
         default:
             printf("ERROR!!\n");
+            exit(EXIT_FAILURE);
             break;
         }
+        // If it makes it to this point we have just -f filename [arg] where arg will be the word
+        search_word(filename, argv[argc - 1]);
     }
-
-    // Read through trove file test
-    search_word("trove-file", "main");
 
     return 0;
 }
-
-// ------------------------------ DEBUG CODE ------------------------------- //
-
-// search_word("trove-file.txt", "hello");
-
-// char buffer[PATH_MAX]; // Get the new absolute path to pass into function for recursive file search
-// char *abs_path = realpath("/tmp", buffer);
-
-// printf("%s\n", buffer);
-
-// Cases
-// 0            1       2            3          4           5           6...inf
-// ----------------------------------- BUILD ------------------------------------- //
-// ./trove      -f      <filename>   -b         -l          <length>    <filelist>
-// ./trove      -f      <filename>   -b         <filelist>
-// ./trove      -b      -l           <length>   <filelist>
-// ./trove      -b      <filelist>
-// ----------------------------------- UPDATE ------------------------------------- //
-// ./trove      -f      <filename>   -u         -l          <length>    <filelist>
-// ./trove      -f      <filename>   -u         <filelist>
-// ./trove      -u      -l           <length>   <filelist>
-// ./trove      -u      <filelist>
-// ----------------------------------- REMOVE ------------------------------------- //
-// ./trove      -f      <filename>   -r         -l          <length>    <filelist>
-// ./trove      -f      <filename>   -r         <filelist>
-// ./trove      -r      -l           <length>   <filelist>
-// ./trove      -r      <filelist>
-// -------------------------------- WORD RETRIEVE --------------------------------- //
-// ./trove      -f      <filename>   <word>
-// ./trove      <word>
