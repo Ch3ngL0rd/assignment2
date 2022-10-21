@@ -571,16 +571,6 @@ void search_word(char *filename, char *word)
 
 void update_trove(char *trove_path, char *update_path)
 {
-    // Retrieve first word in update file
-    // Search for first word in trovefile
-    // If doesn't exist
-    // Append line of update_file to the trove_file
-    // If does exist:
-    // use strtok to split the line in update_file
-    // check if the line split strstr(token , line) - token occurs in line
-    // if it doesnt... append to line somehow
-    // if it does, do nothing
-    // continue to next token
     char abs_trove[PATH_MAX];
     char abs_update[PATH_MAX];
     char *res1 = realpath(trove_path, abs_trove);
@@ -588,56 +578,126 @@ void update_trove(char *trove_path, char *update_path)
 
     FILE *troveptr = fopen(abs_trove, "r+");
     FILE *updateptr = fopen(abs_update, "r");
+    FILE *new_file = fopen("new_file", "w");
     // NEED TO DO A CHECK FOR FAILURE TO OPEN
 
-    char *line_trove = NULL;
-    size_t len_trove = 0;
-    ssize_t read_trove;
+    char *line_update = NULL;
+    size_t len_update = 0;
+    ssize_t read_update;
 
-    while ((read_trove = getline(&line_trove, &len_trove, troveptr)) != -1)
+    while ((read_update = getline(&line_update, &len_update, updateptr)) != -1)
     {
         // // Retrieve the first word from the line
         // Make a copy of line_trove for the strtok to be used on
-        char *tmp1 = (char *)malloc(len_trove + 1);
-        strcpy(tmp1, line_trove);
-        char *token_trove = strtok(tmp1, "\\");
+        char *tmp1 = (char *)malloc(len_update + 1);
+        strcpy(tmp1, line_update);
+        char *token_update = strtok(tmp1, "\\");
 
-        char *line_update = NULL;
-        size_t len_update = 0;
-        ssize_t read_update;
-        while ((read_trove = getline(&line_update, &len_update, updateptr)) != -1)
+        bool found = false; // check to see if word is found or not
+
+        char *line_trove = NULL;
+        size_t len_trove = 0;
+        ssize_t read_trove;
+        while ((read_trove = getline(&line_trove, &len_trove, troveptr)) != -1)
         {
-            char *tmp2 = (char *)malloc(len_update + 1);
-            strcpy(tmp2, line_update);
-            char *token_update = strtok(tmp2, "\\");
+            char *tmp2 = (char *)malloc(len_trove + 1);
+            strcpy(tmp2, line_trove);
+            char *token_trove = strtok(tmp2, "\\");
 
             if (strcmp(token_trove, token_update) == 0)
             {
+                found = true;
+                // printf("OLD STRING FOR WORD %s WAS: %s", token_trove, line_trove);
+                char buffer[100000]; // Taking into account large file paths - would like to set this dynamically but keep running into issues
+                line_update[strcspn(line_update, "\n")] = 0;
+                strcpy(buffer, line_update);
+
                 printf("------------------------------------------\n");
-                printf("This is the trove line: %s", line_trove);
-                printf("This is the word we are comparing from trove: %s\n", token_trove);
-                printf("This is the word we are comparing from update: %s\n\n", token_update);
-                printf("Successfully found word... scanning through now:\n");
+                printf("OLD STRING FOR WORD %s IS: %s\n", token_update, line_update);
+                // printf("This is the trove line: %s", line_trove);
+                // printf("This is the word we are comparing from trove: %s\n", token_trove);
+                // printf("This is the word we are comparing from update: %s\n\n", token_update);
+                // printf("Successfully found word... scanning through now:\n");
 
                 // Scan through to next absolute path
-                token_update = strtok(NULL, "\\");
-                while (token_update != NULL)
+                // token_trove = strtok(NULL, "\\");
+                while (token_trove != NULL)
                 {
-                    if (!strstr(line_trove, token_update))
+                    token_trove[strcspn(token_trove, "\n")] = 0;
+                    if (!strstr(line_update, token_trove))
                     {
-                        // Absolute path not found so append to file
-                        printf("The file path: %s does not appear in trove file - append to end of line!\n\n", token_update);
-                        // fprintf(troveptr, "%s", "TESTING!");
+                        token_trove[strcspn(token_trove, "\n")] = 0;
+                        printf("\nCOMPARING TO: %s\n", line_update);
+                        printf("FOUND PATH NOT CONTAINED IN UPDATE FILE FROM TROVE FILE%s\n\n", token_trove);
+                        buffer[strcspn(buffer, "\n")] = 0;
+                        strcat(buffer, "\\");
+                        strcat(buffer, token_trove); // append absolute path to end of buffer
                     }
 
-                    token_update = strtok(NULL, "\\");
+                    token_trove = strtok(NULL, "\\");
                 }
+                printf("NEW STRING FOR WORD %s IS: %s\n", token_update, buffer);
+                fprintf(new_file, "%s\n", buffer);
+                free(tmp2);
+                break; // no need to keep iterating through
             }
             free(tmp2);
         }
+        // // Didn't find the word in update folder so append the current line being searched to new file
+        if (found == false)
+        {
+            fprintf(new_file, "%s", line_update);
+        }
         free(tmp1);
-        rewind(updateptr);
+        rewind(troveptr);
     }
+    fclose(new_file);
+    new_file = fopen("new_file", "r+"); // opening file in read now
+
+    // Very inefficient but now we need to traverse through the trove file and make sure we have not missed any words
+    char *line_trove = NULL;
+    size_t len_trove = 0;
+    ssize_t read_trove;
+    while ((read_trove = getline(&line_trove, &len_trove, troveptr)) != -1)
+    {
+        char *tmp1 = (char *)malloc(len_trove + 1);
+        strcpy(tmp1, line_trove);
+        char *token_trove = strtok(tmp1, "\\"); // get the word
+
+        printf("%s\n", token_trove);
+
+        char *line_new = NULL;
+        size_t len_new = 0;
+        ssize_t read_new;
+
+        bool found = false;
+
+        while ((read_new = getline(&line_new, &len_new, new_file)) != -1)
+        {
+            char *tmp2 = (char *)malloc(len_new + 1);
+            strcpy(tmp2, line_new);
+            char *token_new = strtok(tmp2, "\\");
+
+            if (strcmp(token_new, token_trove) == 0)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (found == false)
+        {
+            fprintf(new_file, "%s", line_trove);
+        }
+        rewind(new_file);
+    }
+
+    fclose(troveptr);
+    fclose(updateptr);
+    fclose(new_file);
+
+    remove(trove_path);
+    remove(update_path);
+    rename("new_file", trove_path);
 }
 
 // ------------------------------------------------------------------------ //
